@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using System;
+[ExecuteInEditMode]
 public class StreetLayoutGenerator : MonoBehaviour
 {
 
@@ -9,22 +10,41 @@ public class StreetLayoutGenerator : MonoBehaviour
     [SerializeField]
     public TextAsset geoJsonFile;
     public TextAsset intersectionFile;
+    public Terrain topography;
     private string intersectionData = string.Empty;
     private string geoJsonData = string.Empty;
     public Vector2 referencePoint = new Vector2(-124.080f, 40.870f);
     public double sizeConversion = 111320; //controls output size;
-    public GameObject RoadLayout = this.GameObject;
+    public GameObject RoadLayout;
+
+    void OnEnable()
+    {
+        EnsureRoadLayoutExists();
+    }
+
+    private void EnsureRoadLayoutExists()
+    {
+        if (RoadLayout == null)
+        {
+            RoadLayout = new GameObject("RoadLayout");
+            RoadLayout.transform.parent = this.transform;  // Set as child of this GameObject
+            RoadLayout.transform.localPosition = Vector3.zero;  // Optionally, position it at the parent's origin
+        }
+    }
 
 
     // Example method to create a street layout
     public void CreateStreets(string geoJsonData)
     {
-        Debug.Log(sizeConversion);
-        GameObject roadMap = RoadLayout;
         // Parse the GeoJSON data
         GeoJson myGeoJson = LoadGeoJson(geoJsonData);
-        if (RoadLayout == this.GameObject){
-
+        if (RoadLayout == this.gameObject)
+        {
+            // Use a reverse loop to safely remove all children
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                DestroyImmediate(transform.GetChild(i).gameObject);
+            }
         }
 
         foreach (Feature feature in myGeoJson.features)
@@ -61,7 +81,7 @@ public class StreetLayoutGenerator : MonoBehaviour
             {
                 road.roadWidth = 1.0f;
             }
-            streetLine.transform.parent = roadMap.transform;
+            streetLine.transform.parent = RoadLayout.transform;
 
             road.BuildRoad();
             //}
@@ -162,7 +182,7 @@ public class StreetLayoutGenerator : MonoBehaviour
     public Line CreateLine(GameObject streetLine)
     {
         LineRenderer lineRenderer = streetLine.AddComponent<LineRenderer>();
-        streetLine.transform.parent = roadMap.transform;
+        streetLine.transform.parent = RoadLayout.transform;
 
         // Configure the LineRenderer
         lineRenderer.positionCount = streetPoints.Length;
@@ -201,6 +221,17 @@ public class StreetLayoutGenerator : MonoBehaviour
         mesh.RecalculateNormals(); // Important for lighting
 
         return mesh;
+    }
+    public void AttachToTerrain(){
+        foreach(Transform child in RoadLayout.transform){
+            Road road = child.GetComponent<Road>();
+            if(road!=null){
+                RoadConfig config = new RoadConfig();
+                config.AffixToTerrain = true;
+                config.terrain = topography;
+                road.BuildRoad(config);
+            }
+        }
     }
 }
 

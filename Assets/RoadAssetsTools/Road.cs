@@ -6,6 +6,7 @@ using UnityEditor;
 public class RoadConfig
 {
     public bool AffixToTerrain = false;
+    public Terrain terrain;
     public Material RoadMaterial;
     // Add more configuration options as needed
 }
@@ -57,24 +58,19 @@ public class Road : MonoBehaviour
         if (terrain == null)
         {
             Debug.LogError("No Terrain!" + this.gameObject.name);
+            return;
         }
-        else
+        // Adjust only the y-coordinate of the control points based on the terrain height
+        for (int i = 0; i < controlPoints.Length; i++)
         {
-            for (int i = 0, j = 0; i < controlPoints.Length; i++, j += 2)
-            {
-                Vector3 pointOnTerrain = controlPoints[i] + transform.position; // Adjust for object position
-                float terrainHeight = terrain.SampleHeight(pointOnTerrain);
-                pointOnTerrain.y = terrainHeight; // Set y to terrain height
+            // Compute the world position of each control point
+            Vector3 worldPoint = transform.TransformPoint(controlPoints[i]);
 
-                Vector3 forward = Vector3.forward;
-                // Your existing direction and width calculations here...
+            // Sample the height at the given world position
+            float terrainHeight = terrain.SampleHeight(worldPoint) + terrain.transform.position.y;
 
-                Vector3 left = new Vector3(-forward.z, 0, forward.x);
-                vertices[j] = pointOnTerrain + left * roadWidth * 0.5f; // Adjust left vertex
-                vertices[j + 1] = pointOnTerrain - left * roadWidth * 0.5f; // Adjust right vertex
-
-                // Your existing triangle and UV setup here...
-            }
+            // Adjust only the y-component of the control points
+            controlPoints[i].y = terrainHeight - transform.position.y; // Adjust for the object's local position
         }
     }
     public void BuildRoad()
@@ -110,13 +106,13 @@ public class Road : MonoBehaviour
 
         mr.material = config.RoadMaterial ?? roadMaterial;
 
-        CalculateVertices();
 
-        if (config.AffixToTerrain && Terrain.activeTerrain != null)
+
+        if (config.AffixToTerrain && config.terrain != null)
         {
-            AffixToTerrain(Terrain.activeTerrain);
+            AffixToTerrain(config.terrain);
         }
-
+        CalculateVertices();
         // Set mesh properties and rebuild colliders
         mesh.vertices = vertices;
         mesh.triangles = triangles;

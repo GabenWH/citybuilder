@@ -75,3 +75,7 @@ crashlytics-build.properties
 *.key
 *.geojson
 *.json
+*.geojson.meta
+*.json.meta
+*.key.meta
+*.osm

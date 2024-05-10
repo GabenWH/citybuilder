@@ -106,8 +106,6 @@ public class Road : MonoBehaviour
 
         mr.material = config.RoadMaterial ?? roadMaterial;
 
-
-
         if (config.AffixToTerrain && config.terrain != null)
         {
             AffixToTerrain(config.terrain);

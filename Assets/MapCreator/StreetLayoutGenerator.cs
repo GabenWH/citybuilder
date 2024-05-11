@@ -32,7 +32,16 @@ public class StreetLayoutGenerator : MonoBehaviour
         }
     }
 
-
+    public void CreateIntersections(string geoJsonData){
+        GeoJson intersectionData = LoadGeoJson(geoJsonData);
+        foreach(Feature feature in intersectionData.features){
+            Vector3[] intersection = ConvertCoordinatesToVector3(feature.geometry);
+            GameObject intersectionMarker = new GameObject("intersection");
+            intersectionMarker.AddComponent<Intersection>();
+            intersection[0].y = topography.SampleHeight(intersection[0])+topography.transform.position.y;
+            intersectionMarker.transform.position = intersection[0];
+        } 
+    }
     // Example method to create a street layout
     public void CreateStreets(string geoJsonData)
     {
@@ -54,7 +63,6 @@ public class StreetLayoutGenerator : MonoBehaviour
             if (feature.geometry.type == "LineString")
             {
             */
-            Debug.Log(feature.geometry);
             Vector3[] streetPoints = ConvertCoordinatesToVector3(feature.geometry);
             string name = "Generic Street";
             if (feature.properties.ContainsKey("name"))
@@ -147,6 +155,7 @@ public class StreetLayoutGenerator : MonoBehaviour
     public class Feature
     {
         //public string type;
+        [JsonConverter(typeof(SingleArrayToArrayOfArraysConverter))]
         public double[][] geometry;
         public Dictionary<string, object> properties; // To hold any additional metadata
     }
@@ -155,6 +164,7 @@ public class StreetLayoutGenerator : MonoBehaviour
     public class Geometry
     {
         public string type;
+        [JsonConverter(typeof(SingleArrayToArrayOfArraysConverter))]
         public double[][] coordinates;
 
     }

@@ -14,16 +14,16 @@ public class Intersection : MonoBehaviour
         foreach (var hitCollider in hitColliders)
         {
             Road road = hitCollider.transform.parent.GetComponent<Road>();
-            Debug.Log(road==null);
+            Debug.Log(road == null);
             if (road != null && !connectedRoads.Contains(road))
             {
                 // Assume road endpoints are stored as the first and last points in the road
-                if (Vector3.Distance(transform.position, road.controlPoints[0]+road.transform.position) < detectionRadius)
+                if (Vector3.Distance(transform.position, road.controlPoints[0] + road.transform.position) < detectionRadius)
                 {
                     connectedRoads.Add(road);
                     road.ConnectToIntersection(this, true);  // Connect start of the road
                 }
-                if (Vector3.Distance(transform.position, road.transform.position+road.controlPoints[road.controlPoints.Length - 1]) < detectionRadius)
+                if (Vector3.Distance(transform.position, road.transform.position + road.controlPoints[road.controlPoints.Length - 1]) < detectionRadius)
                 {
                     connectedRoads.Add(road);
                     road.ConnectToIntersection(this, false);  // Connect end of the road
@@ -31,7 +31,7 @@ public class Intersection : MonoBehaviour
             }
         }
     }
-        void OnDrawGizmosSelected()
+    void OnDrawGizmosSelected()
     {
         // Visualize the detection area
         Gizmos.color = Color.yellow;
@@ -39,10 +39,13 @@ public class Intersection : MonoBehaviour
     }
     void OnDrawGizmos()
     {
-        foreach (var slot in slots)
+        foreach (IntersectionSlot slot in slots)
         {
             Gizmos.color = Color.red;
             Gizmos.DrawWireSphere(slot.transform.position, 0.1f);  // Visualize the intersection slots
         }
+        // Highlight the main intersection point
+        Gizmos.color = Color.green;  // Using green to distinguish the main intersection
+        Gizmos.DrawWireSphere(transform.position, detectionRadius/2);  // Larger sphere for main intersection
     }
 }

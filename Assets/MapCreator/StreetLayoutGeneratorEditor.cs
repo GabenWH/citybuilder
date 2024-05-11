@@ -32,6 +32,15 @@ public class StreetLayoutCreatorEditor : Editor
                 Debug.LogError("GeoJSONFile not assigned");
             }
         }
+        if(GUILayout.Button("Create Intersections")){
+            if(script.intersectionFile != null){
+                string jsonString = script.intersectionFile.text;
+                script.CreateIntersections(jsonString);
+            }
+            else{
+                Debug.LogError("IntersectionFile not assigned");
+            }
+        }
         if(GUILayout.Button("Attach To Terrain")){
             if(script.topography!= null){
                 script.AttachToTerrain();

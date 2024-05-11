@@ -70,7 +70,7 @@ def find_intersections_and_segments_corrected(streets):
 
         # Now append the dictionary to segments with the updated properties
         segments.append({
-            'geometry': mapping(line_and_properties.line),
+            'geometry': {mapping(line_and_properties.line)},
             'properties': line_and_properties.properties
     })
 

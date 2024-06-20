@@ -39,11 +39,6 @@ public class Intersection : MonoBehaviour
     }
     void OnDrawGizmos()
     {
-        foreach (IntersectionSlot slot in slots)
-        {
-            Gizmos.color = Color.red;
-            Gizmos.DrawWireSphere(slot.transform.position, 0.1f);  // Visualize the intersection slots
-        }
         // Highlight the main intersection point
         Gizmos.color = Color.green;  // Using green to distinguish the main intersection
         Gizmos.DrawWireSphere(transform.position, detectionRadius/2);  // Larger sphere for main intersection

@@ -93,9 +93,6 @@ def center_and_scale_to_meters(segments, intersections, centroid):
     transformer = Transformer.from_proj(Proj('epsg:4326'), projection, always_xy=True)
 
     # Transform centroid to projected system
-    proj_centroid = transformer.transform(centroid.x, centroid.y)
-
-    # Transform centroid to projected system
     proj_centroid_x, proj_centroid_y = transformer.transform(centroid.x, centroid.y)
 
     # Helper function to apply transformation and recenter

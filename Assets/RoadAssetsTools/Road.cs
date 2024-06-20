@@ -26,6 +26,7 @@ public class Road : MonoBehaviour
     private Vector3[] vertices;
     private int[] triangles;
     private Vector2[] uvs;
+    public bool enableColliders = false;
 
 
     void OnDrawGizmos()
@@ -117,7 +118,7 @@ public class Road : MonoBehaviour
         mesh.uv = uvs;
         mesh.RecalculateNormals();
         mf.mesh = mesh;
-        BuildColliders();
+        if(enableColliders)BuildColliders();
     }
     private void CalculateVertices()
     {
@@ -174,28 +175,57 @@ public class Road : MonoBehaviour
         else
             endIntersection = intersection;
     }
-    public void BuildColliders()
+public void BuildColliders()
+{
+    RemoveAllColliders(); // Remove all existing colliders before building new ones
+
+    // Create new colliders
+    for (int i = 0; i < controlPoints.Length - 1; i++)
     {
-        List<GameObject> childrenToDestroy = new List<GameObject>();
-        foreach (Transform child in transform)
-        {
-            if (IsExistingEndCollider(child))
-            {
-                childrenToDestroy.Add(child.gameObject);
-            }
-        }
-        foreach (GameObject child in childrenToDestroy)
-        {
-            DestroyImmediate(child);
-        }
-        AddEndColliders();
+        Vector3 point = controlPoints[i] + this.transform.position;
+        Vector3 nextPoint = controlPoints[i + 1] + this.transform.position;
+
+        Vector3 direction = (nextPoint - point).normalized;
+        Vector3 left = new Vector3(-direction.z, 0, direction.x) * roadWidth * 0.5f;
+
+        // Calculate the center and size of the collider
+        Vector3 center = (point + nextPoint) / 2;
+        Vector3 size = new Vector3(Vector3.Distance(point + left, point - left), 0.05f, Vector3.Distance(point, nextPoint));
+
+        // Create a new GameObject to hold the BoxCollider
+        GameObject colliderObject = new GameObject("RoadCollider");
+        colliderObject.transform.SetParent(this.transform);
+
+        // Set the position and rotation of the collider object
+        colliderObject.transform.position = center;
+        colliderObject.transform.rotation = Quaternion.LookRotation(direction);
+
+        // Add the BoxCollider to the new GameObject
+        BoxCollider boxCollider = colliderObject.AddComponent<BoxCollider>();
+        boxCollider.size = size;
+        boxCollider.center = Vector3.zero; // Center is zero because the GameObject is already positioned correctly
     }
+
+    AddEndColliders();
+}
+
+public void RemoveAllColliders()
+{
+    // Find and destroy all BoxColliders
+    BoxCollider[] existingColliders = GetComponentsInChildren<BoxCollider>();
+    for (int i = existingColliders.Length - 1; i >= 0; i--)
+    {
+        if (existingColliders[i] != null)
+        {
+            DestroyImmediate(existingColliders[i].gameObject); // Destroy the GameObject holding the BoxCollider
+        }
+    }
+}
     void AddEndColliders()
     {
         if (controlPoints.Length < 2) return; // Ensure there are enough points to define the road
         if (endColliderPrefab == null)
         {
-            Debug.Log("Collider not found for Road!");
             return;
         } // Ensure that theres actual colliders to provide
 
@@ -220,4 +250,112 @@ public class Road : MonoBehaviour
         Vector3 roadDirectionEnd = (controlPoints[controlPoints.Length - 1] - controlPoints[controlPoints.Length - 2]).normalized;
         endCollider.transform.forward = roadDirectionEnd;
     }
+    public void SplitRoad(Vector3 splitPoint)
+{
+    // Check if the split point is within the bounds of the road
+    if (!IsPointWithinRoadBounds(splitPoint))
+    {
+        Debug.LogWarning("Split point is not within the bounds of the road.");
+        return;
+    }
+
+    int splitIndex = -1;
+    float minDistance = float.MaxValue;
+    Vector3 closestPoint = Vector3.zero;
+
+    // Find the closest segment to the split point
+    for (int i = 0; i < controlPoints.Length - 1; i++)
+    {
+        Vector3 segmentStart = controlPoints[i];
+        Vector3 segmentEnd = controlPoints[i + 1];
+
+        // Calculate the closest point on the segment to the split point
+        Vector3 point = ClosestPointOnSegment(segmentStart, segmentEnd, splitPoint);
+
+        float distance = Vector3.Distance(splitPoint, point);
+        if (distance < minDistance)
+        {
+            minDistance = distance;
+            splitIndex = i;
+            closestPoint = point;
+        }
+    }
+
+    if (splitIndex == -1) return;
+
+    // Calculate the direction of the road segment
+    Vector3 segmentDirection = (controlPoints[splitIndex + 1] - controlPoints[splitIndex]).normalized;
+    Vector3 roadLeft = new Vector3(-segmentDirection.z, 0, segmentDirection.x) * roadWidth * 0.5f;
+    Vector3 newPoint1 = closestPoint + roadLeft;
+    Vector3 newPoint2 = closestPoint - roadLeft;
+
+    // Insert the split points into the control points array
+    List<Vector3> newControlPoints = new List<Vector3>(controlPoints);
+    newControlPoints.Insert(splitIndex + 1, closestPoint);
+    controlPoints = newControlPoints.ToArray();
+
+    // Create two sets of control points
+    List<Vector3> controlPoints1 = new List<Vector3>();
+    List<Vector3> controlPoints2 = new List<Vector3>();
+
+    for (int i = 0; i <= splitIndex + 1; i++)
+    {
+        controlPoints1.Add(controlPoints[i]);
+    }
+
+    for (int i = splitIndex + 1; i < controlPoints.Length; i++)
+    {
+        controlPoints2.Add(controlPoints[i]);
+    }
+
+    // Create new road segments
+    CreateNewRoadSegment(controlPoints1.ToArray(), "Road Segment 1");
+    CreateNewRoadSegment(controlPoints2.ToArray(), "Road Segment 2");
+
+    // Optionally, destroy the original road segment if needed
+    Destroy(this.gameObject);
+}
+
+private Vector3 ClosestPointOnSegment(Vector3 a, Vector3 b, Vector3 p)
+{
+    Vector3 ab = b - a;
+    float t = Vector3.Dot(p - a, ab) / Vector3.Dot(ab, ab);
+    t = Mathf.Clamp01(t);
+    return a + t * ab;
+}
+
+private void CreateNewRoadSegment(Vector3[] newControlPoints, string segmentName)
+{
+    GameObject newRoadObject = new GameObject(segmentName);
+    newRoadObject.transform.position = this.transform.position; // Ensure new segment is positioned correctly
+    Road newRoad = newRoadObject.AddComponent<Road>();
+    newRoad.controlPoints = newControlPoints;
+    newRoad.roadWidth = this.roadWidth;
+    newRoad.lanes = this.lanes;
+    newRoad.oneLane = this.oneLane;
+    newRoad.roadMaterial = this.roadMaterial;
+    newRoad.endColliderPrefab = this.endColliderPrefab;
+
+    newRoad.BuildRoad();
+}
+
+private bool IsPointWithinRoadBounds(Vector3 point)
+{
+    // Check if the point is within the bounds of the road's control points with width consideration
+    for (int i = 0; i < controlPoints.Length - 1; i++)
+    {
+        if (IsPointWithinSegmentWidth(controlPoints[i], controlPoints[i + 1], point))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+private bool IsPointWithinSegmentWidth(Vector3 a, Vector3 b, Vector3 p)
+{
+    Vector3 closestPoint = ClosestPointOnSegment(a, b, p);
+    float distance = Vector3.Distance(p, closestPoint);
+    return distance <= roadWidth * 0.5f;
+}
 }

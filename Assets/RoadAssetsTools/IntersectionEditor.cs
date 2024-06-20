@@ -23,19 +23,6 @@ public class IntersectionEditor : Editor
 
     void OnSceneGUI()
     {
-        Intersection intersection = (Intersection)target;
-        if (intersection.slots.Count > 0)
-        {
-            foreach (IntersectionSlot slot in intersection.slots)
-            {
-                EditorGUI.BeginChangeCheck();
-                Vector3 newPosition = Handles.PositionHandle(slot.transform.position, slot.transform.rotation);
-                if (EditorGUI.EndChangeCheck())
-                {
-                    Undo.RecordObject(slot.transform, "Move Slot");
-                    slot.transform.position = newPosition;
-                }
-            }
-        }
+        
     }
 }

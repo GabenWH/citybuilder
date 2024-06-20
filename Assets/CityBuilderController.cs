@@ -43,7 +43,7 @@ public class CityBuilderController : MonoBehaviour
     }
     void Update()
     {
-        if(lastPosition!= transform.position){
+        if(lastPosition!= transform.position && buildMenu!= null){
             buildMenu.Hide();
             lastPosition = transform.position;
         }
@@ -204,6 +204,10 @@ public class CityBuilderController : MonoBehaviour
                 Track track = hit.collider.gameObject.GetComponent<Track>();
                 if(track != null){
                     buildMenu.AddOption("Send Train",()=>{traincap.NavigateToPosition(hit.collider.gameObject.GetComponent<Track>());});
+                }
+                Road road = hit.collider.gameObject.GetComponent<Road>();
+                if(road != null){
+                    buildMenu.AddOption("Split Road",()=>{road.SplitRoad(hit.point);});
                 }
             }
         }

@@ -43,10 +43,20 @@ public class TerrainGenerator : MonoBehaviour
             generatedTerrain.terrainData = new TerrainData();
         }
         generatedTerrain.terrainData.size = terrainSize;
-        float[,] heights = new float[heightMap.width,heightMap.height];
-        for(int x = 0; x < heightMap.width; x++){for(int y = 0;y<heightMap.height;y++){
-            Debug.Log("height["+ x+","+y+"]");
-            heights[x,y]=heightMap.GetPixel(x,y).grayscale;
+
+
+        // Set the heightmap resolution to match the dimensions of your heightMap
+        int heightMapWidth = heightMap.width;
+        int heightMapHeight = heightMap.height;
+        generatedTerrain.terrainData.heightmapResolution = Mathf.Max(heightMapWidth, heightMapHeight) + 1;
+
+        float[,] heights = new float[heightMap.width, heightMap.height];
+        for (int x = 0; x < heightMap.width; x++)
+        {
+            for (int y = 0; y < heightMap.height; y++)
+            {
+                Debug.Log("height[" + x + "," + y + "]");
+                heights[x, y] = heightMap.GetPixel(x, y).grayscale;
         }}
         generatedTerrain.terrainData.SetHeights(0,0,heights);
 

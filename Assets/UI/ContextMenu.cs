@@ -26,7 +26,10 @@ public class ContextMenu : MonoBehaviour
     // Method to add a new option to the context menu
     public void AddOption(string optionName, UnityEngine.Events.UnityAction action)
     {
+        Vector3 offset = new Vector3(0, -100*Destroyables.Count,0);
+        
         GameObject buttonObject = Instantiate(buttonPrefab, transform);
+        buttonObject.transform.localPosition += offset;
         Button button = buttonObject.GetComponent<Button>();
         button.onClick.AddListener(action);
         button.GetComponentInChildren<TextMeshProUGUI>().text = optionName;

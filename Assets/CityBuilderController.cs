@@ -171,6 +171,8 @@ public class CityBuilderController : MonoBehaviour
             {
                 // Here, hit.point will give you the world position of where the mouse clicked
                 //DesignatePoint(hit.point);
+                
+                RoadCollider road = hit.collider.gameObject.GetComponent<RoadCollider>();
                 Icon hitTrack = hit.collider.gameObject.GetComponent<Icon>();
                 if(hitTrack!= null && hitTrack.data is Track track){
                     Debug.Log("Clear Icons");
@@ -197,6 +199,13 @@ public class CityBuilderController : MonoBehaviour
             buildMenu.ClearOptions();
             if(Physics.Raycast(ray, out hit)){
                 DestinationTrainController traincap = hit.collider.gameObject.GetComponent<DestinationTrainController>();
+                RoadCollider road = hit.collider.GetComponent<RoadCollider>();
+                if(road!=null){
+                    Debug.Log("Hit Road");
+                    Debug.Log(road.road);
+                    buildMenu.AddOption("Split Road",()=>road.road.SplitRoad(hit.point));
+                    buildMenu.AddOption("Delete Road",()=>Destroy(road.road.gameObject));
+                }
                 if(traincap != null){
                     buildMenu.AddOption("Capture Train",()=> captureTrain(traincap));
 
@@ -204,10 +213,6 @@ public class CityBuilderController : MonoBehaviour
                 Track track = hit.collider.gameObject.GetComponent<Track>();
                 if(track != null){
                     buildMenu.AddOption("Send Train",()=>{traincap.NavigateToPosition(hit.collider.gameObject.GetComponent<Track>());});
-                }
-                Road road = hit.collider.gameObject.GetComponent<Road>();
-                if(road != null){
-                    buildMenu.AddOption("Split Road",()=>{road.SplitRoad(hit.point);});
                 }
             }
         }

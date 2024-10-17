@@ -1,5 +1,11 @@
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+
 using UnityEngine;
 using System.Collections.Generic;
+using System.Collections;
 using Newtonsoft.Json;
 using System;
 [ExecuteInEditMode]
@@ -17,6 +23,9 @@ public class StreetLayoutGenerator : MonoBehaviour
     public double sizeConversion = 111320; //controls output size;
     public GameObject RoadLayout;
 
+    private bool isPaused = false;
+    public Vector3 currentConflictPosition;
+
     void OnEnable()
     {
         EnsureRoadLayoutExists();
@@ -32,16 +41,74 @@ public class StreetLayoutGenerator : MonoBehaviour
         }
     }
 
-    public void CreateIntersections(string geoJsonData){
-        GeoJson intersectionData = LoadGeoJson(geoJsonData);
-        foreach(Feature feature in intersectionData.features){
-            Vector3[] intersection = ConvertCoordinatesToVector3(feature.geometry);
-            GameObject intersectionMarker = new GameObject("intersection");
-            intersectionMarker.AddComponent<Intersection>();
-            intersection[0].y = topography.SampleHeight(intersection[0])+topography.transform.position.y;
-            intersectionMarker.transform.position = intersection[0];
-        } 
+    public void StartCreatingIntersections(string geoJsonData)
+    {
+        StartCoroutine(CreateIntersections(geoJsonData));
     }
+private IEnumerator CreateIntersections(string geoJsonData)
+    {
+        GameObject intersectionHolder = new GameObject("Intersection Holder");
+        GeoJson intersectionData = LoadGeoJson(geoJsonData);
+        foreach (Feature feature in intersectionData.features)
+        {
+            Vector3[] intersection = ConvertCoordinatesToVector3(feature.geometry);
+            Vector3 intersectionPosition = intersection[0];
+            intersectionPosition.y = topography.SampleHeight(intersectionPosition) + topography.transform.position.y;
+
+            if (CheckForIntersectionConflict(intersectionPosition))
+            {
+                currentConflictPosition = intersectionPosition;
+                isPaused = true;
+                EditorUtility.DisplayDialog("Intersection Conflict", "A conflict has been detected. Please resolve it.", "OK");
+
+                // Open the custom editor window with the options
+                PauseIntersectionCreationWindow.ShowWindow(this);
+
+                // Pause here, waiting until isPaused is set to false
+                while (isPaused)
+                {
+                    yield return null;
+                }
+            }
+            else
+            {
+                GameObject intersectionMarker = new GameObject("Intersection");
+                intersectionMarker.transform.parent = intersectionHolder.transform;
+                intersectionMarker.AddComponent<Intersection>();
+                intersectionMarker.transform.position = intersectionPosition;
+            }
+        }
+    }
+
+    
+    // Detect if an intersection overlaps with an existing one
+    private bool CheckForIntersectionConflict(Vector3 intersectionPosition)
+    {
+        Collider[] hitColliders = Physics.OverlapSphere(intersectionPosition, 5.0f); // Adjust radius
+        foreach (Collider hitCollider in hitColliders)
+        {
+            if (hitCollider.GetComponent<Intersection>() != null)
+            {
+                return true;  // Conflict detected
+            }
+        }
+        return false;
+    }
+
+    public void ResolveConflictAutomatically()
+    {
+        // Example of automatic conflict resolution
+        Debug.Log("Automatically resolving the conflict...");
+        isPaused = false;
+    }
+
+    public void StopCreation()
+    {
+        Debug.Log("Stopping the intersection creation process...");
+        isPaused = false;
+    }
+
+
     // Example method to create a street layout
     public void CreateStreets(string geoJsonData)
     {

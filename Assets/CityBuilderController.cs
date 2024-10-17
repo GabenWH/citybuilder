@@ -179,7 +179,7 @@ public class CityBuilderController : MonoBehaviour
                     trainTester.NavigateToPosition(track,hitTrack.transform);
                     ClearTrackIcons();
                 }
-                else{
+                else if(road==null){
                     Debug.Log("Hit nothing");
                     Debug.Log(hitTrack);
                 }
@@ -203,6 +203,7 @@ public class CityBuilderController : MonoBehaviour
                 if(road!=null){
                     Debug.Log("Hit Road");
                     Debug.Log(road.road);
+                    Debug.Log(hit.point);
                     buildMenu.AddOption("Split Road",()=>road.road.SplitRoad(hit.point));
                     buildMenu.AddOption("Delete Road",()=>Destroy(road.road.gameObject));
                 }

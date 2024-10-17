@@ -35,7 +35,7 @@ public class StreetLayoutCreatorEditor : Editor
         if(GUILayout.Button("Create Intersections")){
             if(script.intersectionFile != null){
                 string jsonString = script.intersectionFile.text;
-                script.CreateIntersections(jsonString);
+                script.StartCreatingIntersections(jsonString);
             }
             else{
                 Debug.LogError("IntersectionFile not assigned");

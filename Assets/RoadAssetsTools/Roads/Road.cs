@@ -8,27 +8,38 @@ public class RoadConfig
     public bool AffixToTerrain = false;
     public Terrain terrain;
     public Material RoadMaterial;
+    public int numberOfLanes;
     // Add more configuration options as needed
 }
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
-public class Road : MonoBehaviour
+public class Road : Connectable
 {
-    public Vector3[] controlPoints; // Control points defining the path of the road
+    public Vector3[] controlPoints; // Control points defining the path of the road LOCAL
     public float roadWidth = 8.0f; // Width of the road
-    public int lanes = 2;
-    public bool oneLane = false;
+    public List<Lane> lanes;
+    public int numberOfLanes;
+    public GameObject lanePrefab;
     public Material roadMaterial;
     public Intersection startIntersection;  // Intersection at the start of the road
     public Intersection endIntersection;
     public GameObject endColliderPrefab;
     private string colliderTag = "GenCollider";
+    [SerializeField]
     private Vector3[] vertices;
+    [SerializeField]
     private int[] triangles;
+    [SerializeField]
     private Vector2[] uvs;
     public bool enableColliders = false;
 
 
+    public override void Connect(Connectable other){
+
+    }
+    public override void Disconnect(Connectable other){
+
+    }
     void OnDrawGizmos()
     {
         Gizmos.color = Color.gray;
@@ -48,6 +59,54 @@ public class Road : MonoBehaviour
             Gizmos.DrawLine(point - left, nextPoint - left);
             Gizmos.DrawLine(point + left, point - left);
             Gizmos.DrawLine(nextPoint + left, nextPoint - left);
+        }
+    }
+    public List<Vector3> FindClosestVertices(Vector3 position, float maxDistance = Mathf.Infinity)
+    {
+        List<Vector3> closestVertices = new List<Vector3>();
+        Vector3 localPosition = this.transform.InverseTransformPoint(position);
+        if(vertices == null){
+            CalculateVertices();
+            Debug.Log(vertices.Length);
+        }
+        if(vertices.Length == 0){
+            CalculateVertices();
+            Debug.LogError("No verticies!");
+        }
+        foreach (var vertex in vertices)
+        {
+            float distance = Vector3.Distance(localPosition, vertex);
+            // Check if the vertex is within the maxDistance (if specified)
+            if (distance <= maxDistance)
+            {
+                closestVertices.Add(vertex);
+            }
+        }
+
+        // Sort vertices by distance if needed
+        closestVertices.Sort((a, b) => Vector3.Distance(position, a).CompareTo(Vector3.Distance(position, b)));
+
+        return closestVertices;
+    }
+    void CreateLanes()
+    {
+        if (lanePrefab == null)
+        {
+            Debug.LogError("No lane prefab assigned.");
+            return;
+        }
+
+        float laneOffset = roadWidth / numberOfLanes;
+        float halfRoadWidth = roadWidth * 0.5f;
+
+        for (int i = 0; i < numberOfLanes; i++)
+        {
+            GameObject laneObj = Instantiate(lanePrefab, transform);
+            laneObj.transform.localPosition = Vector3.zero;
+            Lane lane = laneObj.GetComponent<Lane>();
+            float offset = -halfRoadWidth + laneOffset * (i + 0.5f);
+            lane.Initialize(i, laneOffset, controlPoints, offset);
+            lanes.Add(lane);
         }
     }
     void Start()
@@ -76,28 +135,50 @@ public class Road : MonoBehaviour
     }
     public void BuildRoad()
     {
+        if (lanes == null)
+        {
+            lanes = new List<Lane>();
+        }
+        if (lanes.Count == 0)
+        {
+            CreateLanes();
+        }
+
         MeshFilter mf = GetComponent<MeshFilter>();
         MeshRenderer mr = GetComponent<MeshRenderer>();
         Mesh mesh = new Mesh();
-        vertices = new Vector3[controlPoints.Length * 2];
         triangles = new int[(controlPoints.Length - 1) * 6];
-        uvs = new Vector2[vertices.Length];
+        uvs = new Vector2[controlPoints.Length * 2];
+        CalculateVertices();
 
         // Apply the material
         mr.material = roadMaterial;
 
         // I'll remove this when I confirm I haven't regressioned, honestly I should just upload this to github and be done with it
-        CalculateVertices();
+
         // Assign vertices, triangles, and uvs to the mesh
         mesh.vertices = vertices;
         mesh.triangles = triangles;
         mesh.uv = uvs;
         mesh.RecalculateNormals(); // Recalculate normals for proper lighting
         mf.mesh = mesh;
+        // Update lanes control points
+        UpdateLanesControlPoints();
         BuildColliders();
+        CheckIntersections();
     }
     public void BuildRoad(RoadConfig config)
     {
+        if (lanes == null)
+        {
+            lanes = new List<Lane>();
+        }
+        if (lanes.Count != config.numberOfLanes)
+        {
+            numberOfLanes = config.numberOfLanes;
+            CreateLanes();
+        }
+
         MeshFilter mf = GetComponent<MeshFilter>();
         MeshRenderer mr = GetComponent<MeshRenderer>();
         Mesh mesh = new Mesh();
@@ -118,10 +199,18 @@ public class Road : MonoBehaviour
         mesh.uv = uvs;
         mesh.RecalculateNormals();
         mf.mesh = mesh;
-        if (enableColliders) BuildColliders();
+        // Update lanes control points
+        UpdateLanesControlPoints();
+            BuildColliders();
+            CheckIntersections();
     }
     private void CalculateVertices()
     {
+        
+        vertices = new Vector3[controlPoints.Length * 2];
+        if(vertices.Length==0){
+            Debug.LogError("No Vertices!");
+        }
         for (int i = 0, j = 0; i < controlPoints.Length; i++, j += 2)
         {
             Vector3 forward = Vector3.forward;
@@ -155,25 +244,23 @@ public class Road : MonoBehaviour
     {
         return obj.CompareTag(colliderTag);
     }
-    float CalculateIntersectionDistance(Vector3 A, Vector3 B, Vector3 C, float width)
-    {
-        Vector3 AB = (B - A).normalized;
-        Vector3 BC = (C - B).normalized;
-
-        // Calculate the angle in radians between AB and BC
-        float angle = Vector3.Angle(AB, BC) * Mathf.Deg2Rad;
-
-        // Calculate the intersection distance based on the sine of the angle
-        float distance = width / Mathf.Sin(angle);
-
-        return distance;
-    }
     public void ConnectToIntersection(Intersection intersection, bool isStart)
     {
         if (isStart)
             startIntersection = intersection;
         else
             endIntersection = intersection;
+    }
+    private void UpdateLanesControlPoints()
+    {
+        float laneOffset = roadWidth / lanes.Count;
+        float halfRoadWidth = roadWidth * 0.5f;
+
+        for (int i = 0; i < lanes.Count; i++)
+        {
+            float offset = -halfRoadWidth + laneOffset * (i + 0.5f);
+            lanes[i].UpdateControlPoints(controlPoints, offset);
+        }
     }
     public void BuildColliders()
     {
@@ -209,10 +296,26 @@ public class Road : MonoBehaviour
             RoadCollider roadCollider = colliderObject.AddComponent<RoadCollider>();
             roadCollider.road = this;
         }
-
+        
         AddEndColliders();
     }
-
+    public void CheckIntersections(){
+        Collider[] colliders = GetComponentsInChildren<Collider>();
+        foreach(Collider collider in colliders){
+            Collider[] hits = Physics.OverlapBox(collider.bounds.center, collider.bounds.extents, collider.transform.rotation);
+            foreach (Collider hit in hits)
+            {
+                // Ignore self-collisions
+                if (hit != collider)
+                {
+                    if (hit.TryGetComponent<Intersection>(out Intersection intersection))
+                    {
+                        intersection.AttachRoad(this);
+                    }
+                }
+            }
+        }
+    }
     public void RemoveAllColliders()
     {
         // Destroy all child GameObjects holding the colliders
@@ -255,17 +358,20 @@ public class Road : MonoBehaviour
     }
     public void SplitRoad(Vector3 splitPoint)
     {
+        splitPoint = splitPoint - this.transform.position;
 
         // Check if the split point is within the bounds of the road
         if (!IsPointWithinRoadBounds(splitPoint))
         {
             Debug.Log(splitPoint);
             Debug.LogWarning("Split point is not within the bounds of the road.");
-            return;
         }
-        else{
+        else
+        {
             Debug.Log("Within bounds, split proceeding");
+            Debug.Log("Hit point:" + splitPoint);
         }
+
         int splitIndex = -1;
         float minDistance = float.MaxValue;
         Vector3 closestPoint = Vector3.zero;
@@ -287,7 +393,7 @@ public class Road : MonoBehaviour
                 closestPoint = point;
             }
         }
-
+        Debug.Log("Closest point to hit point:" + closestPoint);
         if (splitIndex == -1) return;
 
         // Calculate the direction of the road segment
@@ -323,21 +429,21 @@ public class Road : MonoBehaviour
         Destroy(this.gameObject);
     }
 
-private Vector3 ClosestPointOnSegment(Vector3 a, Vector3 b, Vector3 p)
-{
-    // Ignore the y axis by projecting onto the XZ plane
-    Vector3 aXZ = new Vector3(a.x, 0, a.z);
-    Vector3 bXZ = new Vector3(b.x, 0, b.z);
-    Vector3 pXZ = new Vector3(p.x, 0, p.z);
+    private Vector3 ClosestPointOnSegment(Vector3 a, Vector3 b, Vector3 p)
+    {
+        // Ignore the y axis by projecting onto the XZ plane
+        Vector3 aXZ = new Vector3(a.x, 0, a.z);
+        Vector3 bXZ = new Vector3(b.x, 0, b.z);
+        Vector3 pXZ = new Vector3(p.x, 0, p.z);
 
-    Vector3 ab = bXZ - aXZ; // Direction vector from point A to point B
-    float t = Vector3.Dot(pXZ - aXZ, ab) / Vector3.Dot(ab, ab); // Project point P onto the line defined by A and B, normalize to the segment length
-    t = Mathf.Clamp01(t); // Clamp t to the range [0, 1] to ensure the point is within the segment
-    Vector3 closestPointXZ = aXZ + t * ab; // Calculate the closest point on the segment in XZ plane
+        Vector3 ab = bXZ - aXZ; // Direction vector from point A to point B
+        float t = Vector3.Dot(pXZ - aXZ, ab) / Vector3.Dot(ab, ab); // Project point P onto the line defined by A and B, normalize to the segment length
+        t = Mathf.Clamp01(t); // Clamp t to the range [0, 1] to ensure the point is within the segment
+        Vector3 closestPointXZ = aXZ + t * ab; // Calculate the closest point on the segment in XZ plane
 
-    // Return the closest point with the original y value of p
-    return new Vector3(closestPointXZ.x, p.y, closestPointXZ.z);
-}
+        // Return the closest point with the original y value of p
+        return new Vector3(closestPointXZ.x, p.y, closestPointXZ.z);
+    }
 
 
     private void CreateNewRoadSegment(Vector3[] newControlPoints, string segmentName)
@@ -347,11 +453,17 @@ private Vector3 ClosestPointOnSegment(Vector3 a, Vector3 b, Vector3 p)
         Road newRoad = newRoadObject.AddComponent<Road>();
         newRoad.controlPoints = newControlPoints;
         newRoad.roadWidth = this.roadWidth;
-        newRoad.lanes = this.lanes;
-        newRoad.oneLane = this.oneLane;
         newRoad.roadMaterial = this.roadMaterial;
         newRoad.endColliderPrefab = this.endColliderPrefab;
-
+        newRoad.lanes = new List<Lane>();
+        newRoad.numberOfLanes = this.numberOfLanes;
+        foreach (var lane in this.lanes)
+        {
+            var newLane = lane.Clone();
+            newLane.gameObject.transform.parent = newRoad.transform;
+            newLane.transform.localPosition = new Vector3(0, 0, 0);
+            newRoad.lanes.Add(newLane);
+        }
         newRoad.BuildRoad();
     }
 
@@ -360,7 +472,7 @@ private Vector3 ClosestPointOnSegment(Vector3 a, Vector3 b, Vector3 p)
         // Check if the point is within the bounds of the road's control points with width consideration
         for (int i = 0; i < controlPoints.Length - 1; i++)
         {
-            if (IsPointWithinSegmentWidth(controlPoints[i]+transform.position, controlPoints[i + 1]+transform.position, point))
+            if (IsPointWithinSegmentWidth(controlPoints[i] + transform.position, controlPoints[i + 1] + transform.position, point))
             {
                 return true;
             }
@@ -368,18 +480,39 @@ private Vector3 ClosestPointOnSegment(Vector3 a, Vector3 b, Vector3 p)
         return false;
     }
 
-private bool IsPointWithinSegmentWidth(Vector3 a, Vector3 b, Vector3 p)
-{
-    Vector3 closestPoint = ClosestPointOnSegment(a, b, p);
-
-    // Check if the closest point is exactly at a or b
-    if (Vector3.Distance(closestPoint, a) < Mathf.Epsilon || Vector3.Distance(closestPoint, b) < Mathf.Epsilon)
+    private bool IsPointWithinSegmentWidth(Vector3 a, Vector3 b, Vector3 p)
     {
-        return false;
-    }
+        Vector3 closestPoint = ClosestPointOnSegment(a, b, p);
 
-    // Calculate the distance in the XZ plane
-    float distance = Vector3.Distance(new Vector3(p.x, 0, p.z), new Vector3(closestPoint.x, 0, closestPoint.z));
-    return distance <= roadWidth * 0.5f;
-}
+        // Check if the closest point is exactly at a or b
+        if (Vector3.Distance(closestPoint, a) < Mathf.Epsilon || Vector3.Distance(closestPoint, b) < Mathf.Epsilon)
+        {
+            return false;
+        }
+
+        // Calculate the distance in the XZ plane
+        float distance = Vector3.Distance(new Vector3(p.x, 0, p.z), new Vector3(closestPoint.x, 0, closestPoint.z));
+        return distance <= roadWidth * 0.5f;
+    }
+    public (Vector3, float) ClosestPointOnLines(Vector3[] points, Vector3 P)
+    {
+        float minDist = float.MaxValue;
+        Vector3 closestPoint = Vector3.zero;
+
+        for (int i = 0; i < points.Length - 1; i++)
+        {
+            Vector3 A = points[i];
+            Vector3 B = points[i + 1];
+            Vector3 Q = ClosestPointOnSegment(A, B, P);
+            float d = Vector3.Distance(P, Q);
+
+            if (d < minDist)
+            {
+                minDist = d;
+                closestPoint = Q;
+            }
+        }
+
+        return (closestPoint, minDist);
+    }
 }

@@ -40,6 +40,9 @@ public class Road : Connectable
     public override void Disconnect(Connectable other){
 
     }
+    public override float getWidth(){
+        return roadWidth;;
+    }
     void OnDrawGizmos()
     {
         Gizmos.color = Color.gray;

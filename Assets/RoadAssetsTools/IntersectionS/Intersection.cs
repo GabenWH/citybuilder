@@ -6,14 +6,24 @@ public class Intersection : Connectable
 {
     public List<Node> nodes = new List<Node>();
     public List<Road> connectedRoads = new List<Road>();
+    public List<Intersection> connectedIntersections = new List<Intersection>();
     public float detectionRadius = 5.0f;
     public GameObject intersectionTarmac;
 
     public override void Connect(Connectable other){
-
+        throw new NotImplementedException();
     }
     public override void Disconnect(Connectable other){
-
+        throw new NotImplementedException();
+    }
+    public override float getWidth(){
+        return detectionRadius;
+    }
+    public void AttachIntersection(Intersection intersection){
+        if(connectedIntersections.Contains(intersection)){
+            connectedIntersections.Remove(intersection);
+        }
+        
     }
     public void AttachRoad(Road road)
     {
@@ -23,9 +33,12 @@ public class Intersection : Connectable
             foreach (var lane in road.lanes)
             {
                 Node selectedNode = nodes.FirstOrDefault(node => node.lane == lane);
-                Debug.Log(selectedNode.gameObject.name + "Removed");
-                nodes.Remove(selectedNode);
-                DestroyImmediate(selectedNode.gameObject);
+                if(selectedNode != null)
+                {
+                    Debug.Log(selectedNode.gameObject.name + "Removed");
+                    nodes.Remove(selectedNode);
+                    DestroyImmediate(selectedNode.gameObject);
+                }
             }
         }
         AttachNodesToRoad(road);

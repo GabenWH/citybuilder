@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
+using System.Linq;
 
 public class RoadConfig
 {
@@ -17,12 +18,14 @@ public class Road : Connectable
 {
     public Vector3[] controlPoints; // Control points defining the path of the road LOCAL
     public float roadWidth = 8.0f; // Width of the road
+    public Connectable startConnectable;
+    public Connectable endConnectable;
+    public BoxCollider startCollider;
+    public BoxCollider endCollider;
     public List<Lane> lanes;
     public int numberOfLanes;
     public GameObject lanePrefab;
     public Material roadMaterial;
-    public Intersection startIntersection;  // Intersection at the start of the road
-    public Intersection endIntersection;
     public GameObject endColliderPrefab;
     private string colliderTag = "GenCollider";
     [SerializeField]
@@ -33,15 +36,96 @@ public class Road : Connectable
     private Vector2[] uvs;
     public bool enableColliders = false;
 
+    public List<Connectable> startCollidingObjects = new List<Connectable>();
+    public List<Connectable> endCollidingObjects = new List<Connectable>();
 
-    public override void Connect(Connectable other){
+    void OnTriggerEnter(Collider other)
+    {
+        Connectable connectable = other.GetComponent<Connectable>();
+        if (connectable == null) return;
 
+        if (startCollider.bounds.Intersects(other.bounds))
+        {
+            startCollidingObjects.Add(connectable);
+        }
+        if (endCollider.bounds.Intersects(other.bounds))
+        {
+            endCollidingObjects.Add(connectable);
+        }
     }
-    public override void Disconnect(Connectable other){
 
+    void OnTriggerExit(Collider other)
+    {
+        Connectable connectable = other.GetComponent<Connectable>();
+        if (connectable == null) return;
+
+        if (startCollider.bounds.Intersects(other.bounds))
+        {
+            startCollidingObjects.Remove(connectable);
+        }
+        if (endCollider.bounds.Intersects(other.bounds))
+        {
+            endCollidingObjects.Remove(connectable);
+        }
     }
-    public override float getWidth(){
-        return roadWidth;;
+
+    public override void Connect(Connectable connectable)
+    {
+        if (startCollidingObjects.Contains(connectable))
+        {
+            startConnectable = connectable;
+        }
+        else if (endCollidingObjects.Contains(connectable))
+        {
+            endConnectable = connectable;
+        }
+#if UNITY_EDITOR
+        if(startCollider==null||endCollider==null){
+            Debug.LogError("Colliders misconfigured" + "\nstartCollider:" + startCollider + "\nendCollider"+endCollider);
+            return;
+        }
+        else{
+        }
+        
+        var frontHits = Physics.OverlapBox(startCollider.bounds.center,   startCollider.bounds.extents, startCollider.transform.rotation);
+        var backHits = Physics.OverlapBox(endCollider.bounds.center, endCollider.bounds.extents, endCollider.transform.rotation);
+        Debug.Log("start hits:" + frontHits.Length + " back hits:" + backHits.Length);
+        
+        //find better names for con
+var foundConnectable = frontHits
+    .Select(hit => hit.gameObject.GetComponent<Connectable>())
+    .FirstOrDefault(con => con != null && con == connectable);
+
+if (foundConnectable != null)
+{
+    startConnectable = foundConnectable;
+}
+    foundConnectable = backHits
+    .Select(hit => hit.gameObject.GetComponent<Connectable>())
+    .FirstOrDefault(con => con != null && con == connectable);
+    if(foundConnectable != null)   {
+        endConnectable = foundConnectable;
+    }
+        
+#endif
+    }
+    public override void Check(Connectable other)
+    {
+    }
+    public override void Disconnect(Connectable connectable)
+    {
+        if (connectable == startConnectable)
+        {
+            startConnectable = null;
+        }
+        if (connectable == endConnectable)
+        {
+            endConnectable = null;
+        }
+    }
+    public override float getWidth()
+    {
+        return roadWidth;
     }
     void OnDrawGizmos()
     {
@@ -68,11 +152,13 @@ public class Road : Connectable
     {
         List<Vector3> closestVertices = new List<Vector3>();
         Vector3 localPosition = this.transform.InverseTransformPoint(position);
-        if(vertices == null){
+        if (vertices == null)
+        {
             CalculateVertices();
             Debug.Log(vertices.Length);
         }
-        if(vertices.Length == 0){
+        if (vertices.Length == 0)
+        {
             CalculateVertices();
             Debug.LogError("No verticies!");
         }
@@ -136,6 +222,7 @@ public class Road : Connectable
             controlPoints[i].y = terrainHeight - transform.position.y; // Adjust for the object's local position
         }
     }
+    //possibly needs to be deleted and replaced with something default?
     public void BuildRoad()
     {
         if (lanes == null)
@@ -165,9 +252,9 @@ public class Road : Connectable
         mesh.uv = uvs;
         mesh.RecalculateNormals(); // Recalculate normals for proper lighting
         mf.mesh = mesh;
-        // Update lanes control points
         UpdateLanesControlPoints();
         BuildColliders();
+        //needs to be fixed later
         CheckIntersections();
     }
     public void BuildRoad(RoadConfig config)
@@ -204,14 +291,14 @@ public class Road : Connectable
         mf.mesh = mesh;
         // Update lanes control points
         UpdateLanesControlPoints();
-            BuildColliders();
-            CheckIntersections();
+        BuildColliders();
     }
     private void CalculateVertices()
     {
-        
+
         vertices = new Vector3[controlPoints.Length * 2];
-        if(vertices.Length==0){
+        if (vertices.Length == 0)
+        {
             Debug.LogError("No Vertices!");
         }
         for (int i = 0, j = 0; i < controlPoints.Length; i++, j += 2)
@@ -247,13 +334,6 @@ public class Road : Connectable
     {
         return obj.CompareTag(colliderTag);
     }
-    public void ConnectToIntersection(Intersection intersection, bool isStart)
-    {
-        if (isStart)
-            startIntersection = intersection;
-        else
-            endIntersection = intersection;
-    }
     private void UpdateLanesControlPoints()
     {
         float laneOffset = roadWidth / lanes.Count;
@@ -270,8 +350,9 @@ public class Road : Connectable
         RemoveAllColliders(); // Remove all existing colliders before building new ones
 
         // Create new colliders
-        for (int i = 0; i < controlPoints.Length - 1; i++)
+        for (int i = 0; i < controlPoints.Length-1; i++)
         {
+
             Vector3 point = controlPoints[i] + this.transform.position;
             Vector3 nextPoint = controlPoints[i + 1] + this.transform.position;
 
@@ -283,7 +364,7 @@ public class Road : Connectable
             Vector3 size = new Vector3(Vector3.Distance(point + left, point - left), 0.05f, Vector3.Distance(point, nextPoint));
 
             // Create a new child GameObject to hold the BoxCollider
-            GameObject colliderObject = new GameObject("RoadCollider");
+            GameObject colliderObject = new GameObject("RoadCollider "+i);
             colliderObject.transform.SetParent(this.transform);
 
             // Set the position and rotation of the collider object
@@ -298,38 +379,86 @@ public class Road : Connectable
             // Add the RoadCollider script to reference the Road script
             RoadCollider roadCollider = colliderObject.AddComponent<RoadCollider>();
             roadCollider.road = this;
+
+            if (i == 0)
+            {
+                startCollider = boxCollider;
+                colliderObject.name = "StartCollider";
+            }
+            if (i == controlPoints.Length - 2)
+            {
+                colliderObject.name = "EndCollider";
+                endCollider = boxCollider;
+            }
+            if(controlPoints.Length==2){
+                colliderObject.name = "RoadCollider";
+            }
         }
-        
-        AddEndColliders();
+
+        //AddEndColliders();
     }
-    public void CheckIntersections(){
-        Collider[] colliders = GetComponentsInChildren<Collider>();
-        foreach(Collider collider in colliders){
-            Collider[] hits = Physics.OverlapBox(collider.bounds.center, collider.bounds.extents, collider.transform.rotation);
-            foreach (Collider hit in hits)
+    public void CheckIntersections()
+    {
+        if(startCollider==null){
+            Debug.LogError("No start collider");
+            return;
+            }
+        if(endCollider==null){
+            Debug.Log(startCollider);
+            Debug.Log(endCollider);
+            Debug.LogError("No end collider");
+        return;
+        }
+
+            
+            Collider[] startHits = Physics.OverlapBox(startCollider.bounds.center, startCollider.bounds.extents, startCollider.transform.rotation);
+            Collider[] endHits = Physics.OverlapBox(endCollider.bounds.center, endCollider.bounds.extents, endCollider.transform.rotation);
+
+            // Combine both arrays into a single list
+            List<Collider> combinedHits = new List<Collider>(startHits);
+            combinedHits.AddRange(endHits);
+            if(startConnectable!=null){
+            startConnectable.Disconnect(this);
+            }
+            if(endConnectable!=null){
+            endConnectable.Disconnect(this);
+            }
+            foreach (Collider hit in combinedHits)
             {
                 // Ignore self-collisions
-                if (hit != collider)
+                if (hit != GetComponent<Collider>())
                 {
-                    if (hit.TryGetComponent<Intersection>(out Intersection intersection))
+                    if (hit.gameObject.TryGetComponent<Intersection>(out Intersection intersection))
                     {
-                        intersection.AttachRoad(this);
+                        Debug.Log("intersection found!: " + intersection.gameObject.name);
+                        intersection.Connect(this);
+                        Connect(intersection);
+                        intersection.BuildIntersectionTarmac(intersection.SimpleIntersectionStyle);
                     }
                 }
             }
-        }
+
     }
-    public void RemoveAllColliders()
+public void RemoveAllColliders()
+{
+    // Collect all children first
+    List<Transform> childrenToRemove = new List<Transform>();
+
+    foreach (Transform child in transform)
     {
-        // Destroy all child GameObjects holding the colliders
-        foreach (Transform child in transform)
+        if (child.GetComponent<RoadCollider>() != null)
         {
-            if (child.name == "RoadCollider")
-            {
-                DestroyImmediate(child.gameObject);
-            }
+            childrenToRemove.Add(child);
         }
     }
+
+    // Now, remove all collected children
+    foreach (Transform child in childrenToRemove)
+    {
+        DestroyImmediate(child.gameObject);
+    }
+}
+
     void AddEndColliders()
     {
         if (controlPoints.Length < 2) return; // Ensure there are enough points to define the road

@@ -8,6 +8,7 @@ public class Node : MonoBehaviour
     public bool input = false;
     public bool output = false;
     public Lane lane;
+    public Road road;
     void Start()
     {
         

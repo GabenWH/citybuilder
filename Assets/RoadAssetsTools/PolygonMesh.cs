@@ -96,4 +96,39 @@ public class PolygonMesh : MonoBehaviour
         }
         meshRenderer.material = new Material(Shader.Find("Standard"));
     }
+    public float FindShortestDistanceAcrossPolygon()
+    {
+        if (vertices == null || vertices.Count < 3)
+        {
+            Debug.LogError("Polygon must have at least 3 vertices.");
+            return 0f;
+        }
+
+        float minDistance = float.MaxValue;
+
+        // Iterate through each edge of the polygon
+        for (int i = 0; i < vertices.Count; i++)
+        {
+            Vector3 start = vertices[i];
+            Vector3 end = vertices[(i + 1) % vertices.Count];
+
+            // Get the direction vector of the edge
+            Vector3 edgeDir = (end - start).normalized;
+
+            // Create a perpendicular vector to the edge direction on the XZ plane
+            Vector3 perpendicularDir = Vector3.Cross(edgeDir, Vector3.up).normalized;
+
+            // Find distances between this edge and other vertices
+            foreach (var vertex in vertices)
+            {
+                if (vertex != start && vertex != end)
+                {
+                    float distance = Mathf.Abs(Vector3.Dot(vertex - start, perpendicularDir));
+                    minDistance = Mathf.Min(minDistance, distance);
+                }
+            }
+        }
+
+        return minDistance;
+    }
 }

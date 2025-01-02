@@ -32,7 +32,7 @@ public class RoadEditor : Editor
         {
             Undo.RecordObject(road, "Move Road Control Point");
             EditorUtility.SetDirty(road);
-            road.BuildRoad(); // Rebuild the road if it uses a dynamic mesh based on control points
+            ///road.BuildRoad(); // Rebuild the road if it uses a dynamic mesh based on control points
         }
     }
     public override void OnInspectorGUI()
@@ -43,10 +43,6 @@ public class RoadEditor : Editor
         if (GUILayout.Button("Build Road"))
         {
             road.BuildRoad();
-        }
-        if(GUILayout.Button("Build End Colliders"))
-        {
-            road.BuildColliders();
         }
     }
 }

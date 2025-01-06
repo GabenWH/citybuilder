@@ -16,6 +16,8 @@ public class MergeNode : MonoBehaviour
 
     // Selected merge behavior from the inspector
     public MergeBehaviour mergeBehaviour;
+    public Intersection intersection;
+    
     public List<Node> nodes = new List<Node>();
 
     public List<Lane> mergeLanes = new List<Lane>();
@@ -48,7 +50,21 @@ public class MergeNode : MonoBehaviour
     {
         // Update logic if needed
     }
+public Vector3 GetGeometricCenterLinq(List<Node> nodes)
+{
+    // Filter out null entries, then apply Aggregate
+    var validNodes = nodes.Where(n => n != null).ToList();
+    if (!validNodes.Any())
+    {
+        Debug.LogWarning("No valid nodes found, returning Vector3.zero.");
+        return Vector3.zero;
+    }
 
+    Vector3 sum = validNodes.Aggregate(Vector3.zero,
+        (currentSum, node) => currentSum + node.transform.position);
+
+    return sum / validNodes.Count;
+}
     // Example of a default lane generation behavior
     private List<Lane> DefaultGenerateLaneBehaviour(List<Node> nodes, List<MergeNode> mergeNodes, PolygonMesh tarmac)
     {

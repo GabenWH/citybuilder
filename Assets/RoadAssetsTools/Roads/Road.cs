@@ -292,6 +292,9 @@ if (foundConnectable != null)
         // Update lanes control points
         UpdateLanesControlPoints();
         BuildColliders();
+        
+        //needs to be fixed later
+        CheckIntersections();
     }
     private void CalculateVertices()
     {
@@ -419,9 +422,11 @@ if (foundConnectable != null)
             combinedHits.AddRange(endHits);
             if(startConnectable!=null){
             startConnectable.Disconnect(this);
+            Disconnect(startConnectable);
             }
             if(endConnectable!=null){
             endConnectable.Disconnect(this);
+            Disconnect(endConnectable);
             }
             foreach (Collider hit in combinedHits)
             {

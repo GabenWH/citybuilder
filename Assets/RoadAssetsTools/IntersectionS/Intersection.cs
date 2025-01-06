@@ -223,6 +223,7 @@ public class Intersection : Connectable
         if (mainNode != null)
         {
             mainNode.mergeBehaviour = behaviour;
+            mainNode.intersection = this;
         }
     }
     public void BuildIntersectionTarmac(Func<List<Road>, Transform, List<Vector3>> buildVerticesFunc)

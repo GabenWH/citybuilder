@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulation Modes</title>
+  <style>
+    :root {
+      --bg: #f7f4ef;
+      --ink: #1f1f1f;
+      --muted: #5a5a5a;
+      --accent: #b75a2a;
+      --panel: #ffffff;
+      --border: #e2ddd4;
+      --code: #f0ece6;
+    }
+    body {
+      margin: 0;
+      font-family: "Georgia", "Times New Roman", serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    header {
+      padding: 32px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #fff, var(--bg));
+    }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 28px 0 8px; font-size: 20px; }
+    h3 { margin: 20px 0 6px; font-size: 16px; }
+    p { margin: 8px 0; }
+    main { padding: 16px 24px 40px; max-width: 980px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 12px 0;
+    }
+    code, pre {
+      background: var(--code);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: "Menlo", "Consolas", monospace;
+      font-size: 13px;
+    }
+    pre { padding: 10px; overflow: auto; }
+    code { padding: 1px 6px; }
+    ul { padding-left: 20px; }
+    .note { color: var(--muted); }
+    .accent { color: var(--accent); font-weight: bold; }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Simulation Modes</h1>
+    <p class="note">Mode-specific rules and how they connect through transfers.</p>
+    <p>
+      <a href="overview.html">Overview</a> |
+      <a href="backend_api.html">Backend API</a> |
+      <a href="modes.html">Modes</a>
+    </p>
+  </header>
+  <main>
+    <section>
+      <h2>Shared Concepts</h2>
+      <div class="panel">
+        <ul>
+          <li><span class="accent">Mode networks</span> are separate graphs with their own rules.</li>
+          <li><span class="accent">Transfers</span> connect modes (walk-to-stop, station, airport).</li>
+          <li><span class="accent">Routing</span> can be mode-specific or multi-modal.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Road (Car + Bus)</h2>
+      <div class="panel">
+        <ul>
+          <li>Lane-cell flow model for scale.</li>
+          <li>Intersection phases or priority rules.</li>
+          <li>Bus stops are lane-side transfer nodes.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Rail (Train + Metro)</h2>
+      <div class="panel">
+        <ul>
+          <li>Schedule-based movement per line.</li>
+          <li>Capacity constraints at stations.</li>
+          <li>Transfers to walk grid or bus stops.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Air (Planes)</h2>
+      <div class="panel">
+        <ul>
+          <li>OD between airports with coarse travel times.</li>
+          <li>Flights treated as long-duration trips.</li>
+          <li>Transfers via airport nodes.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Walking</h2>
+      <div class="panel">
+        <ul>
+          <li>Coarse grid or sidewalk graph.</li>
+          <li>Low cost, short distance travel.</li>
+          <li>Primary glue between other modes.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Mode Choice (v1)</h2>
+      <div class="panel">
+        <p>Simple static weights for now. Future: dynamic pricing, congestion, time-of-day.</p>
+        <pre><code>mode = WeightedChoice({
+  Walk: 0.2,
+  Car: 0.5,
+  Bus: 0.15,
+  Train: 0.1,
+  Metro: 0.04,
+  Plane: 0.01
+});</code></pre>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,48 @@
+#pragma kernel ClearNext
+#pragma kernel StepAgents
+
+RWStructuredBuffer<uint> AgentCell;
+RWStructuredBuffer<uint> CurrOcc;
+RWStructuredBuffer<uint> NextOcc;
+
+uint _CellCount;
+uint _AgentCount;
+
+[numthreads(256, 1, 1)]
+void ClearNext(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _CellCount) return;
+    NextOcc[id.x] = 0;
+}
+
+[numthreads(256, 1, 1)]
+void StepAgents(uint3 id : SV_DispatchThreadID)
+{
+    uint agentId = id.x;
+    if (agentId >= _AgentCount) return;
+
+    uint cell = AgentCell[agentId];
+    uint next = cell + 1;
+    if (next >= _CellCount) next = 0;
+
+    // Try to claim the next cell.
+    uint original;
+    InterlockedCompareExchange(NextOcc[next], 0, agentId + 1, original);
+    if (original == 0)
+    {
+        AgentCell[agentId] = next;
+        return;
+    }
+
+    // Fall back to current cell if it is still free in the next buffer.
+    InterlockedCompareExchange(NextOcc[cell], 0, agentId + 1, original);
+    if (original == 0)
+    {
+        AgentCell[agentId] = cell;
+    }
+    else
+    {
+        // No free cell; keep position (occupancy is best-effort for this test).
+        AgentCell[agentId] = cell;
+    }
+}

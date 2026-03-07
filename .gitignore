@@ -72,6 +72,7 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
 # Personal additions
+.DS_Store
 *.key
 *.geojson
 *.json

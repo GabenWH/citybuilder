@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City Builder Simulation Overview</title>
+  <style>
+    :root {
+      --bg: #f7f4ef;
+      --ink: #1f1f1f;
+      --muted: #5a5a5a;
+      --accent: #b75a2a;
+      --panel: #ffffff;
+      --border: #e2ddd4;
+      --code: #f0ece6;
+    }
+    body {
+      margin: 0;
+      font-family: "Georgia", "Times New Roman", serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    header {
+      padding: 32px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #fff, var(--bg));
+    }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 28px 0 8px; font-size: 20px; }
+    h3 { margin: 20px 0 6px; font-size: 16px; }
+    p { margin: 8px 0; }
+    main { padding: 16px 24px 40px; max-width: 980px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 12px 0;
+    }
+    code, pre {
+      background: var(--code);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: "Menlo", "Consolas", monospace;
+      font-size: 13px;
+    }
+    pre { padding: 10px; overflow: auto; }
+    code { padding: 1px 6px; }
+    ul { padding-left: 20px; }
+    .note { color: var(--muted); }
+    .accent { color: var(--accent); font-weight: bold; }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>City Builder Simulation Overview</h1>
+    <p class="note">Backend-first architecture with Unity as renderer. Simple lifecycle now, extensible later.</p>
+    <p>
+      <a href="overview.html">Overview</a> |
+      <a href="backend_api.html">Backend API</a> |
+      <a href="modes.html">Modes</a>
+    </p>
+  </header>
+  <main>
+    <section>
+      <h2>Goals</h2>
+      <div class="panel">
+        <ul>
+          <li>Support huge populations (500k to 5M) with realistic-enough movement.</li>
+          <li>Keep lifecycle logic intact but decouple it from movement fidelity.</li>
+          <li>Allow multiple transit modes: car, bus, train, metro, plane, walking.</li>
+          <li>Use Unity for rendering and tools, not for core simulation.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Core Architecture</h2>
+      <div class="grid">
+        <div class="panel">
+          <h3>Backend (authoritative)</h3>
+          <ul>
+            <li>Lifecycle and demand generation.</li>
+            <li>Routing and traffic simulation.</li>
+            <li>Multimodal networks + transfers.</li>
+            <li>Deterministic time-stepping.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Unity (renderer/tools)</h3>
+          <ul>
+            <li>Send inputs (network snapshot, seeds, actions).</li>
+            <li>Receive render buffers (positions, headings, mode ids).</li>
+            <li>Visualize and debug.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="note">Unity can still provide editor tooling, but core sim data lives in the backend.</p>
+    </section>
+
+    <section>
+      <h2>Lifecycle (v1, simple)</h2>
+      <div class="panel">
+        <p>Lifecycle runs in the backend and is intentionally minimal for now. It is easy to extend later.</p>
+        <pre><code>State machine:
+AtHome -> TravelingToDest -> AtDest -> TravelingHome -> AtHome
+
+Each agent has:
+- home_id
+- primary_dest_id
+- state
+- next_state_time
+- selected_mode
+- eta</code></pre>
+        <p class="note">Future: schedules, needs, multi-stop chains, stochastic deviations.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Movement Model</h2>
+      <div class="panel">
+        <p><span class="accent">Flow-based traffic</span> for scale. We simulate lane cells, not per-agent collision.</p>
+        <ul>
+          <li>Road lanes are 1D grids of fixed-size cells.</li>
+          <li>Cells store occupancy, speed, and next-step intent.</li>
+          <li>Intersections use simple right-of-way or phase rules.</li>
+          <li>Visual agents are sampled from occupancy.</li>
+        </ul>
+        <p class="note">This preserves "flowing cars" visuals without per-agent micro-sim costs.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Modes and Transfers</h2>
+      <div class="panel">
+        <ul>
+          <li>Car/Bus: lane-cell flow.</li>
+          <li>Train/Metro: schedule-based segments.</li>
+          <li>Plane: coarse OD + airport nodes.</li>
+          <li>Walking: coarse grid or sidewalk graph.</li>
+          <li>Transfers: walk links between modes (stops, stations, airports).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Unity/Backend Interface</h2>
+      <div class="panel">
+        <p>Unity does not read a JSON 30 times a second.</p>
+        <ul>
+          <li>JSON is only for <span class="accent">initial load</span> or offline data.</li>
+          <li>At runtime, we use binary buffers or shared memory.</li>
+          <li>Unity reads a compact buffer each frame (positions, headings, ids).</li>
+        </ul>
+        <pre><code>Typical runtime flow:
+1) Unity sends initial network + seed data once
+2) Backend runs Step(dt) on its own loop
+3) Unity pulls render buffers each frame</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>Data Model (minimal v1)</h2>
+      <div class="panel">
+        <pre><code>Agent
+- id
+- home_id
+- dest_id
+- state
+- mode
+- eta
+
+Trip
+- agent_id
+- origin_node
+- dest_node
+- mode
+- depart_time
+
+LaneCell
+- lane_id
+- cell_index
+- occupancy
+- speed
+
+TransferNode
+- id
+- mode_mask
+- position</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>Extensibility Notes</h2>
+      <div class="panel">
+        <ul>
+          <li>Add needs/schedules without changing movement model.</li>
+          <li>Add new transit modes by adding a network + transfer links.</li>
+          <li>Swap out routing algorithm without touching Unity.</li>
+          <li>Scale population by adjusting flow density and visual sampling.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

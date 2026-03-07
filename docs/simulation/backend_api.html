@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulation Backend API</title>
+  <style>
+    :root {
+      --bg: #f7f4ef;
+      --ink: #1f1f1f;
+      --muted: #5a5a5a;
+      --accent: #b75a2a;
+      --panel: #ffffff;
+      --border: #e2ddd4;
+      --code: #f0ece6;
+    }
+    body {
+      margin: 0;
+      font-family: "Georgia", "Times New Roman", serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    header {
+      padding: 32px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #fff, var(--bg));
+    }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 28px 0 8px; font-size: 20px; }
+    h3 { margin: 20px 0 6px; font-size: 16px; }
+    p { margin: 8px 0; }
+    main { padding: 16px 24px 40px; max-width: 980px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 12px 0;
+    }
+    code, pre {
+      background: var(--code);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: "Menlo", "Consolas", monospace;
+      font-size: 13px;
+    }
+    pre { padding: 10px; overflow: auto; }
+    code { padding: 1px 6px; }
+    ul { padding-left: 20px; }
+    .note { color: var(--muted); }
+    .accent { color: var(--accent); font-weight: bold; }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Simulation Backend API</h1>
+    <p class="note">Binary buffer interface for Unity rendering. JSON is load-time only.</p>
+    <p>
+      <a href="overview.html">Overview</a> |
+      <a href="backend_api.html">Backend API</a> |
+      <a href="modes.html">Modes</a>
+    </p>
+  </header>
+  <main>
+    <section>
+      <h2>Runtime Data Flow</h2>
+      <div class="panel">
+        <pre><code>Startup (one-time)
+1) Unity sends network snapshot + seed data
+2) Backend builds internal structures
+
+Simulation loop (backend)
+1) Step(dt)
+2) Update lifecycle and demand
+3) Update per-mode movement
+4) Produce render buffers
+
+Unity loop
+1) Pull render buffers
+2) Update instances + UI</code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>Core Messages</h2>
+      <div class="grid">
+        <div class="panel">
+          <h3>Inputs to Backend</h3>
+          <ul>
+            <li>NetworkSnapshot (roads, rails, stops, transfers)</li>
+            <li>AgentSeedBatch (initial population)</li>
+            <li>Commands (spawn, despawn, reroute, pause)</li>
+            <li>SimParams (timestep, mode weights)</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Outputs to Unity</h3>
+          <ul>
+            <li>RenderBuffer<Car/Bus/Train/Walk></li>
+            <li>Stats (throughput, congestion, averages)</li>
+            <li>Debug buffers (optional)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Binary Buffer Layout (v1)</h2>
+      <div class="panel">
+        <p>These are GPU-friendly structs. Unity reads them as raw bytes.</p>
+        <pre><code>struct RenderInstance
+{
+    float px, py, pz;   // position
+    float fx, fy, fz;   // forward
+    uint  id;           // stable id for selection/debug
+    uint  mode;         // 0 car, 1 bus, 2 train, 3 metro, 4 plane, 5 walk
+};
+
+struct SimStats
+{
+    uint active_agents;
+    uint traveling_agents;
+    float avg_travel_time;
+    float avg_speed;
+};</code></pre>
+        <p class="note">Render buffers are per mode, fixed capacity, and updated every frame.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Network Snapshot (load-time JSON)</h2>
+      <div class="panel">
+        <p>JSON is used only at startup or for offline authoring.</p>
+        <pre><code>{
+  "nodes": [...],
+  "segments": [...],
+  "lanes": [...],
+  "stops": [...],
+  "transfers": [...]
+}</code></pre>
+        <p class="note">Runtime uses binary buffers; no JSON parsing per frame.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Lifecycle API (simple v1)</h2>
+      <div class="panel">
+        <pre><code>enum AgentState
+{
+    AtHome,
+    TravelingToDest,
+    AtDest,
+    TravelingHome
+};
+
+struct Agent
+{
+    uint id;
+    uint home_id;
+    uint dest_id;
+    uint state;
+    uint mode;
+    float eta;
+};</code></pre>
+        <p class="note">Lifecycle is backend-only, extendable later with schedules and needs.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Update Order (per tick)</h2>
+      <div class="panel">
+        <ol>
+          <li>Advance time, process timers.</li>
+          <li>Transition lifecycle states (depart/arrive).</li>
+          <li>Route or re-route (if needed).</li>
+          <li>Mode simulation (roads, rails, walk, air).</li>
+          <li>Emit render buffers and stats.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section>
+      <h2>Notes on Performance</h2>
+      <div class="panel">
+        <ul>
+          <li>Unity does zero per-agent logic.</li>
+          <li>Agents can be sampled for rendering (visuals != full sim).</li>
+          <li>All buffers are fixed-size to avoid allocations.</li>
+          <li>Backend can run faster than Unity and interpolate results.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

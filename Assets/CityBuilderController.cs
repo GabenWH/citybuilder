@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
+using CityBuilder.Roads;
 
 public class CityBuilderController : MonoBehaviour
 {
@@ -30,6 +31,9 @@ public class CityBuilderController : MonoBehaviour
     public ContextMenu buildMenu;
     private RectTransform canvasRectTransform;
     private DestinationTrainController trainTester;
+    [Header("Road Build")]
+    [SerializeField] private RoadBuildTool roadBuildTool;
+    private bool buildMode;
 
 
     private bool isRightMouseDown = false;
@@ -40,6 +44,11 @@ public class CityBuilderController : MonoBehaviour
     void Start(){
         canvasRectTransform = mainCanvas.GetComponent<RectTransform>();
         lastPosition = transform.position;
+        if (roadBuildTool == null)
+        {
+            roadBuildTool = FindObjectOfType<RoadBuildTool>();
+        }
+        SetBuildMode(false);
     }
     void Update()
     {
@@ -84,6 +93,10 @@ public class CityBuilderController : MonoBehaviour
         transform.position = pos;
         if(isRotating)HandleCameraRotation();
         HandleInput();
+        if (Input.GetKeyDown(KeyCode.B))
+        {
+            SetBuildMode(!buildMode);
+        }
     }
 
     private void captureTrain(DestinationTrainController train)
@@ -155,6 +168,16 @@ public class CityBuilderController : MonoBehaviour
     }
     private void HandleInput()
     {
+        // In build mode, let RoadBuildTool own the clicks; right-click cancels placement.
+        if (buildMode)
+        {
+            if (Input.GetMouseButtonDown(1) && roadBuildTool != null)
+            {
+                roadBuildTool.CancelBuild();
+            }
+            return;
+        }
+
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
         RaycastHit hit;
@@ -270,4 +293,22 @@ public class CityBuilderController : MonoBehaviour
         Destroy(existingMenu.gameObject);
     }
 }
+
+    private void SetBuildMode(bool enabled)
+    {
+        buildMode = enabled;
+        if (roadBuildTool != null)
+        {
+            roadBuildTool.enabled = enabled;
+            if (!enabled)
+            {
+                roadBuildTool.CancelBuild();
+            }
+        }
+        // Hide context menu when switching modes
+        if (buildMenu != null)
+        {
+            buildMenu.Hide();
+        }
+    }
 }

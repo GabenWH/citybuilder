@@ -1,0 +1,59 @@
+#pragma kernel ClearNext
+#pragma kernel StepAgentsCollision
+
+RWStructuredBuffer<uint> AgentCell;
+RWStructuredBuffer<float> AgentSpeed;
+RWStructuredBuffer<uint> CurrOcc;
+RWStructuredBuffer<uint> NextOcc;
+
+uint _CellCount;
+uint _AgentCount;
+float _Accel;
+float _Decel;
+float _MaxSpeed;
+
+[numthreads(256, 1, 1)]
+void ClearNext(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _CellCount) return;
+    NextOcc[id.x] = 0;
+}
+
+[numthreads(256, 1, 1)]
+void StepAgentsCollision(uint3 id : SV_DispatchThreadID)
+{
+    uint agentId = id.x;
+    if (agentId >= _AgentCount) return;
+
+    uint cell = AgentCell[agentId];
+    uint next = cell + 1;
+    if (next >= _CellCount) next = 0;
+
+    // Simple collision rule: if next cell occupied, decelerate; else accelerate.
+    float speed = AgentSpeed[agentId];
+    if (CurrOcc[next] != 0)
+    {
+        speed = max(0.0, speed - _Decel);
+    }
+    else
+    {
+        speed = min(_MaxSpeed, speed + _Accel);
+    }
+    AgentSpeed[agentId] = speed;
+
+    // Move at most 1 cell per tick when speed >= 0.5.
+    uint target = (speed >= 0.5) ? next : cell;
+
+    // Try to claim target cell in next occupancy buffer.
+    uint original;
+    InterlockedCompareExchange(NextOcc[target], 0, agentId + 1, original);
+    if (original == 0)
+    {
+        AgentCell[agentId] = target;
+        return;
+    }
+
+    // Fall back to current cell if target was taken.
+    InterlockedCompareExchange(NextOcc[cell], 0, agentId + 1, original);
+    AgentCell[agentId] = cell;
+}

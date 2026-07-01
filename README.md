@@ -9,12 +9,8 @@ Features
     Functional Vehicles: Vehicles can navigate the roads and intersections realistically.
 
 Installation
+Just clone it and run unity :P, its 2022.something
 
-    Clone the Repository:
-
-    bash
-
-git clone [your-repository-url]
 
 Install Python Dependencies:
 Navigate to the scripts directory and install the required Python packages.

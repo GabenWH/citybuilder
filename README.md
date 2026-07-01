@@ -8,7 +8,7 @@ Features
     Intersection Markings: Proper markings at intersections to guide vehicles.
     Functional Vehicles: Vehicles can navigate the roads and intersections realistically.
 
-Installation
+Installation:
 Just clone it and run unity :P, its 2022.something
 
 

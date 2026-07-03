@@ -79,3 +79,7 @@ crashlytics-build.properties
 *.json.meta
 *.key.meta
 *.osm
+
+# Unity package metadata required to resolve project dependencies.
+!/Packages/manifest.json
+!/Packages/packages-lock.json
